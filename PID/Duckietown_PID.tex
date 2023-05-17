@@ -1,0 +1,304 @@
+% !TEX TS-program = latex
+% !TEX encoding = UTF-8 Unicode 
+\documentclass[11pt,onecolumn]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{polski}
+\usepackage[T1]{fontenc}
+\usepackage{times}
+\usepackage{amssymb,amsmath,amsfonts}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{setspace}
+\usepackage{bm}
+
+\usepackage{epstopdf}
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\graphicspath{ {../img/}{./img/}{./} }
+
+\usepackage[colorlinks=true, pdfstartview=FitV, linkcolor=blue, 
+            citecolor=blue, urlcolor=blue]{hyperref}
+
+%
+\setlength{\topmargin}{0.0cm}
+\setlength{\textheight}{21.0cm}
+\setlength{\oddsidemargin}{1.0cm}
+\setlength{\evensidemargin}{1.0cm}
+\setlength{\textwidth}{15cm}
+%
+\newcommand*{\diag}{\mathop{\mathrm{diag}}\nolimits}
+\newcommand*{\col}{\mathop{\mathrm{col}}\nolimits}
+
+
+\begin{document}
+
+\title{\textbf{AUTOMATYKA POJAZDOWA} \\
+Laboratorium nr xx: Duckiebot line follower - PID}
+\date{}
+
+\maketitle
+
+% -------------------------------------------------------------------------------------------
+\section{Cele ćwiczenia} \label{sec:cele}
+%
+Celem zajęć jest implementacja dyskretnego regulatora PID realizującego zadanie nadążania za linią autonomicznego robota Duckiebot.
+%
+% -------------------------------------------------------------------------------------------
+\section{Wymagane kwalifikacje osób realizujących ćwiczenie} \label{sec:kwalifikacje}
+%
+\subsection{Przygotowanie do zajęć} \label{sub:przygotowanie}
+%
+Do realizacji ćwiczenia potrzebne są następujące kwalifikacje: 
+\begin{itemize}
+   \item umiejętność programowania w środowisku MATLAB;
+   \item znajomość protokołu komunikacyjnego CAN;
+   \item znajomość koncepcji rozproszonych systemów sterowania;
+   \item znajomość podstaw elektroniki i systemów mikroprocesorowych.
+\end{itemize}
+
+Dodatkowo w celu poprawnej realizacji ćwiczenia konieczna jest znajomość przybornika \emph{Vehicle Network Toolbox} \cite{MathWorks19_VNT} będącego częścią środowiska MATLAB; w szczególności istotna będzie obsługa komunikacji CAN (tj. wysyłanie ramek, odbieranie ramek, tworzenie ramek) z poziomu Simulinka oraz znajomość i sposób wykorzystania plików DBC \cite{SL_DBC,Vector_DBC}. 
+
+%
+\subsection{Kryteria weryfikacji} \label{sub:kryteria_wer}
+%
+Przed rozpoczęciem laboratorium odbędzie się wstępna weryfikacja niezbędnych umiejętności, które student powinien opanować, aby poprawnie i w zadanym czasie wykonać ćwiczenie. Test weryfikujący będzie dotyczył umiejętności programowania w środowisku MATLAB, znajomości przybornika \emph{Vehicle Network Toolbox}, znajomości formatu DBC oraz protokołu komunikacyjnego CAN.
+
+Weryfikacja ma formę 5 pytań, które są zadawane przez Prowadzącego ćwiczenia danej grupie projektowej (zob. tab.~\ref{tab:test_weryfikacyjny}). Brak poprawnej odpowiedzi przez grupę na zadane pytanie oznacza 0 punktów, częściowo poprawna lub niepełna odpowiedź oznacza 1 punkt, pełna i poprawna odpowiedź to 2 punkty. Warunkiem koniecznym dopuszczenia grupy do laboratorium jest uzyskanie przez nią 5 punktów na 10 możliwych. W przypadku niedopuszczenia grupy do zajęć, grupa przystępuję do ponownego wykonania tego samego ćwiczenia na kolejnych zajęciach włączając to test kwalifikacyjny.
+%
+\begin{table}[!ht]
+%% increase table row spacing, adjust to taste
+\renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of
+% \extrarowheight as needed to properly centre the text within the cells
+\caption{Elementy testu weryfikacyjnego oraz stosowana punktacja: $0$ - w przypadku braku lub niepoprawnej odpowiedzi, $1$ - w przypadku częściowo poprawnej lub niepełnej odpowiedzi, $2$ - w przypadku pełnej i poprawnej odpowiedzi.}
+\label{tab:test_weryfikacyjny}
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Element testu weryfikacyjnego} & \textbf{Punktacja} \\
+\hline
+\hline
+Pytanie sprawdzające nr 1 & $0$, $1$ lub $2$ \\
+\hline
+Pytanie sprawdzające nr 2 & $0$, $1$ lub $2$ \\
+\hline
+Pytanie sprawdzające nr 3 & $0$, $1$ lub $2$ \\
+\hline
+Pytanie sprawdzające nr 4 & $0$, $1$ lub $2$ \\
+\hline
+Pytanie sprawdzające nr 5 & $0$, $1$ lub $2$ \\
+\hline
+\end{tabular}
+\end{table}
+%
+%-------------------------------------------------------------------------------------------
+\section{Opis stanowiska laboratoryjnego} \label{sec:opis_stanowiska}
+%
+Do wykonania ćwiczenia jest potrzebny komputer PC z zainstalowanym pakietem MATLAB wraz z przybornikami: Simulink i  \emph{Vehicle Network Toolbox}. Ikona programu MATLAB znajduje się na pulpicie komputera (zob. rys.~\ref{fig:matlab}). Przybornik (z ang. \emph{toolbox}) Simulink (rys.~\ref{fig:simulink}) uruchamia się z głównego okna programu MATLAB. Przybornik \emph{Vehicle Network Toolbox} oferuje również bibliotekę bloczków, które można wykorzystać z poziomu Simulinka.
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.2\columnwidth]{fig_matlab}
+   \caption{Ikona programu MATLAB.}
+   \label{fig:matlab}
+\end{figure}
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.5\columnwidth]{fig_simulink}
+   \caption{Okno bibliotek Simulinka.}
+   \label{fig:simulink}
+\end{figure}
+%
+Dokumentacja techniczna środowiska MATLAB i wszystkich oferowanych przyborników jest dostępna poprzez stronę internetową firmy MathWorks \cite{MathWorks19}.
+
+Komputer PC musi być dodatkowo wyposażony w interfejs CAN (np. kartę CANcardXL lub moduł VN od firmy Vector Informatik GmbH) za pomocą którego będzie można się komunikować z zestawem wskaźników deski rozdzielczej (zob. rys.~\ref{fig:setup}).
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.9\columnwidth]{fig_setup}
+   \caption{Połączenie komputera PC z zestawem wskaźników deski rozdzielczej.}
+   \label{fig:setup}
+\end{figure}
+%
+
+Zamiast środowiska MATLAB/Simulink oraz przybornika \emph{Vehicle Network Toolbox} można wykorzystać środowisko CANoe od firmy Vector Informatik GmbH. W takim przypadku jest potrzebna pełna wersja programu.
+% -------------------------------------------------------------------------------------------
+\section{Wymagane informacje do realizacji ćwiczenia} \label{sec:wymagane_inf}
+%
+Plik DBC (\emph{CAN Database Container}) zawiera definicje sygnałów i komunikatów oraz wiele innych informacji związanych z siecią CAN \cite{Vector_DBC}. Format pliku jest quasi-standardem opracowanym i zastrzeżonym przez niemiecką firmę Vector Informatik GmbH, która jest głównym dostawcą oprogramowania do odczytu i edycji plików o rozszerzeniu DBC. Podstawowymi narzędziami do obsługi tego formatu są programy CANdb++ Editor, CANalyzer oraz CANoe.
+% -------------------------------------------------------------------------------------------
+\section{Przebieg ćwiczenia} \label{sec:przebieg}
+%
+Tematem laboratorium jest opracowanie aplikacji, za pomocą której będzie możliwe sterowanie zestawem wskaźników w samochodzie. Zestaw wskaźników będący przedmiotem ćwiczenia jest w samochodzie podłączony do magistrali CAN, po której komunikuje się on z pozostałymi układami. Zestawy wskaźników we współczesnych samochodach można traktować jako elementy rozproszonego systemu informacji i rozrywki. Współczesne wersje deski rozdzielczej są bowiem konfigurowalnymi panelami z multimedialnymi funkcjami. 
+
+Sterowanie zestawem wskaźników na ćwiczeniu laboratoryjnym powinno się odbywać z komputera PC wyposażonego w odpowiedni interfejs CAN. Na komputerze PC za pomocą oprogramowania MATLAB lub CANoe należy zbudować model symulacyjny, który będzie wysyłał na magistralę CAN określone informacje. Informacje te po odebraniu i odpowiedniej interpretacji zostaną wyświetlone przez zestaw wskaźników. 
+
+Zestaw wskaźników należy podłączyć do zasilacza z ustawionym napięciem wyjściowym na poziomie $12\,{\rm V}$ oraz maksymalnym natężeniem prądu na poziomie $1\, \rm{A}$. Przewód komunikacyjny należy podłączyć bezpośrednio do kabla CAN Transceiver, który z drugiej strony łączy się z kartą modułem komunikacyjnym Vector VN5640 znajdującej się w komputerze (zob. rys.~\ref{fig:setup}).
+
+W dalszej części instrukcji zostały podane kroki niezbędne do zbudowania modelu symulacyjnego z poziomu środowisku MATLAB.
+\begin{itemize}
+\item[(1)] Uruchomić program MATLAB oraz przybornik Simulink.
+%
+\item[(2)] W programie po kliknięciu w pole symulacji należy wpisać \emph{can}. Pojawią się bloczki, które odpowiadają za obsługę magistrali CAN. Drugim sposobem jest skorzystanie z biblioteki bloczków Simulinka. Interesujące nas bloczki znajdują się w bibliotece \emph{Vehicle Network Toolbox -> CAN Communication} (rys.~\ref{fig:config_1}).
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.7\columnwidth]{fig_config_1}
+   \caption{Biblioteka bloczków Simulinka z blokami przybornika \emph{Vehicle Network Toolbox}.}
+   \label{fig:config_1}
+\end{figure}
+%   
+\item[(3)] Najważniejszym bloczkiem jest blok komunikacji pomiędzy Simulinkiem a magistralą CAN, czyli \emph{CAN Configuration} (rys.~\ref{fig:config_2}). 
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.5\columnwidth]{fig_config_2}
+   \caption{Blok komunikacji \emph{CAN Configuration}.}
+   \label{fig:config_2}
+\end{figure}
+%
+W polu \emph{Device} wybieramy podłączone do komputera urządzenie CAN. W naszym przypadku jest to Vector VN5640 posiadające dwa kanały. Wybieramy kanał (Channel 17), do którego podłączona jest deska rozdzielcza za pomocą kabla. Prędkość ustawiamy na $500 \, {\rm kbs}$.
+%
+\item[(4)] Do wysyłania ramek na magistralę potrzebne nam są dwa bloczki: \emph{CAN Pack} oraz \emph{CAN Transmit}. Pierwszy służy do tworzenia ramki CAN z wartości przypisanych do sygnałów. W naszym przypadku korzystając z bazy danych ramek CAN dla deski rozdzielczej otrzymamy gotowy bloczek, do którego będzie można podpinać odpowiednie wartości do odpowiednich wyprowadzeń sygnałów. W polu \emph{Data is input as} wybieramy \emph{CANdb specified signals}. Pozwala to na dołączenie bazy danych, w której zdefiniowane są wiadomości oraz sygnały. Pole \emph{CANdb file} służy do dołączenie bazy danych zawierającej informację o ramkach CAN. W przypadku deski rozdzielczej baza ta nazywa się \emph{database.dbc} i można ją pobrać z platformy e-learningowej Moodle. Poniżej (zob. rys.~\ref{fig:config_3}) znajduje się lista wiadomości, z której możemy wybrać ramkę, którą będzie reprezentował bloczek \emph{CAN Pack}. Podgląd sygnałów w ramce znajduje się u dołu okna. 
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.7\columnwidth]{fig_config_3}
+   \caption{Parametry bloku \emph{CAN Pack}.}
+   \label{fig:config_3}
+\end{figure}
+%
+Po edycji bloczek \emph{CAN Pack} powinien wyglądać tak, jak na rys.~\ref{fig:config_4}. Po lewej stronie widać sygnały, a po prawej wyjście ramki CAN, które podłączamy do bloczka \emph{CAN Transmit}. Bloczek ten pozwala na wybranie urządzenia, na które ma zostać wysłana ramka. Dodatkowo posiada on możliwość transmitowania ramki cyklicznie. Doświadczalnie ustalono, że w celu poprawnego działania bloczek powinien transmitować cyklicznie wiadomości z okresem $0.01\,{\rm s}$ (zob. rys.~\ref{fig:config_5}).
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.8\columnwidth]{fig_config_4}
+   \caption{Wygenerowany bloczek \emph{CAN Pack}.}
+   \label{fig:config_4}
+\end{figure}
+%
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.6\columnwidth]{fig_config_5}
+   \caption{Parametry bloku \emph{CAN Transmit}.}
+   \label{fig:config_5}
+\end{figure}
+%
+\item[(5)] Do interesujących nas sygnałów należy podłączyć bloczki \emph{Constant}, które pozwolą na modyfikację wartości w trakcie działania programu.
+%
+\item[(6)] W celu uruchomienia deski rozdzielczej należy dodać za pomocą bloczka \emph{CAN Pack} wiadomości \emph{HMIIOM\_DISP\_01P} oraz \emph{HMIIOM\_DISP\_11P} odpowiednio ustawionymi sygnałami znajdującymi się w tab.~\ref{tab:messages}. Wartości innych sygnałów można sprawdzić w programie CANdb++ Editor po wczytaniu interesującej nas bazy danych. Pamiętać należy, że w do bloczka \emph{Constant} można wprowadzić tylko dane w dziesiętnym formacie liczb.
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.9\columnwidth]{fig_config_6}
+   \caption{Podgląd bazy danych DBC w programie CANdb++ Editor.}
+   \label{fig:config_6}
+\end{figure}
+%
+%
+\begin{table}[!ht]
+%% increase table row spacing, adjust to taste
+\renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of
+% \extrarowheight as needed to properly centre the text within the cells
+\caption{Sygnały sterujące pracą zestawu wskaźników deski rozdzielczej.}
+\label{tab:messages}
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Sygnał} & \textbf{Wiadomość} & \textbf{Wartość hex} & \textbf{Wartość dec} \\
+\hline
+\hline
+\emph{VehicleMode\_Running} & \emph{HMIIOM\_DISP\_01P} & ${\rm 0x6}$ & $6$\\
+\hline
+\emph{VehicleMode\_UB} & \emph{HMIIOM\_DISP\_01P} & ${\rm 0x1}$ & $1$\\
+\hline
+\emph{DIDIlluminationLevel\_cmd} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0xFF}$ & $255$\\
+\hline
+\emph{LEDIntensity} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0x10}$ & $16$\\
+\hline
+\emph{GaugeIllumLevelCmd} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0xFF}$ & $255$\\
+\hline
+\emph{ContrastLevelCmd} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0x7F}$ & $127$\\
+\hline
+\emph{TelltaleIntensity} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0x10}$ & $16$\\
+\hline
+\emph{BacklightCmd} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0x10}$ & $16$\\
+\hline
+\emph{ClusterDisIllLvlCmd} & \emph{HMIIOM\_DISP\_11P} & ${\rm 0xFF}$ & $255$\\
+\hline
+\end{tabular}
+\end{table}
+%
+\item[(7)] Ramki \emph{HMIIOM\_DISP\_01P} oraz \emph{HMIIOM\_DISP\_11P}wysyłane cyklicznie zapewniają pracę deski rozdzielczej. W celu sterowania deską w czasie rzeczywistym można z bazy danych DBC wybrać sygnały odpowiadające za aktywację poszczególnych funkcji wyświetlacza (zob. rys.~\ref{fig:config_6}).
+%
+\begin{figure}[!ht]
+   \centering
+   \includegraphics[width=0.9\columnwidth]{fig_ipc_output}
+   \caption{Funkcje zestawu wskaźników deski rozdzielczej.}
+   \label{fig:ipc_output}
+\end{figure}
+%
+\end{itemize}
+% -------------------------------------------------------------------------------------------
+\section{Sprawozdanie z realizacji ćwiczenia} \label{sec:sprawozdanie}
+%
+\subsection{Wymagania dotyczące sprawozdania} \label{sub:wymagania}
+%
+Sprawozdanie z ćwiczenia laboratoryjnego powinno zawierać następujące elementy:
+\begin{itemize}
+ \item[A.] Informacje o zespole realizującym ćwiczenie;
+ \item[B.] Sformułowanie problemu;
+ \item[C.] Sposób rozwiązania problemu;
+ \item[D.] Wyniki przeprowadzonych analiz, symulacji, testów i eksperymentów;
+ \item[E.] Wnioski.
+\end{itemize}
+%
+
+Do wykonania sprawozdania należy wykorzystać szablon, który jest umieszczony na platformie e-learningowej Moodle. Informacje związane z każdym z elementów sprawozdania A-E powinny znaleźć się na tylko na jednej stronie zgodnie z przygotowanym szablonem. Przebieg i rezultaty ćwiczenia należy przedstawić w sposób jednocześnie zwarty ale na tyle bogaty w informacje, aby osoba przeglądająca sprawozdanie mogła na jego podstawie odtworzyć przebieg ćwiczenia. Każde sprawozdanie powinno łącznie zawierać pięć stron.
+
+Sprawozdanie z ćwiczeń laboratoryjnych (jedno na grupę laboratoryjną) należy wysłać w postaci pliku PDF poprzez platformę e-learrningową Moodle najpóźniej przed rozpoczęciem kolejnych zajęć.
+Plik ze sprawozdaniem należy nazwać zgodnie z poniższym schematem: 
+\begin{equation} \label{equ:nazwa_spr}
+ AP\_LXX\_RRRRMMDD\_HHMM\_GYY.pdf\,,
+\end{equation}
+gdzie \emph{AP} jest skrótem od nazwy przedmiotu Automatyki Pojazdowej, \emph{LXX} oznacza numer ćwiczenia laboratoryjnego, np. \emph{L01}, \emph{L02} itd, \emph{RRRRMMDD} jest datą wykonania ćwiczenia, np. \emph{20190301} co oznacza, że ćwiczenie zostało wykonane 1 marca 2019 roku, \emph{HHMM} jest czasem rozpoczęcia ćwiczenia laboratoryjnego, np. \emph{1030} co oznacza, że ćwiczenia laboratoryjne rozpoczęły się o godzinie 10:30, \emph{GYY} oznacza numer grupy laboratoryjnej, np.\emph{G01}, \emph{G02}, \emph{G03} lub \emph{G04} – numery grup nadaje Prowadzący zajęcia.
+%
+\subsection{Kryteria zaliczenia ćwiczenia} \label{sub:kryteria_zal}
+%
+Tab.~\ref{tab:elem_kryterium_zal} przedstawia elementy składające się na kryterium zaliczenia ćwiczenia. W ramach każdego elementu kryterium można uzyskać 0, 1 lub 2 punkty. W sumie za w pełni poprawnie wykonane ćwiczenie laboratoryjne grupa (a tym samym każda osoba obecna i biorąca czynny udział w realizacji ćwiczenia) może otrzymać 10 punktów.
+\begin{table}[!ht]
+%% increase table row spacing, adjust to taste
+\renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of
+% \extrarowheight as needed to properly centre the text within the cells
+\caption{Elementy kryterium zaliczenia ćwiczenia oraz stosowana punktacja.}
+\label{tab:elem_kryterium_zal}
+\centering
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Element testu weryfikacyjnego} & \textbf{Punktacja} \\
+\hline
+\hline
+Punkty z testu weryfikacyjnego & $0$ – w przypadku uzyskania przez grupę $5$ lub $6$ punktów w teście weryfikacyjnym; $1$ – w przypadku uzyskania przez grupę $7$ lub $8$ punktów w teście weryfikacyjnym; $2$ – w przypadku uzyskania przez grupę $9$ lub $10$ punktów w teście weryfikacyjnym \\
+\hline
+Pytanie sprawdzające nr 1 & $0$ – w przypadku braku lub niepoprawnej odpowiedzi; $1$ – w przypadku częściowo poprawnej lub niepełnej odpowiedzi; $2$ – w przypadku pełnej i poprawnej odpowiedzi \\
+\hline
+Pytanie sprawdzające nr 2 & $0$ – w przypadku braku lub niepoprawnej odpowiedzi; $1$ – w przypadku częściowo poprawnej lub niepełnej odpowiedzi; $2$ – w przypadku pełnej i poprawnej odpowiedzi \\
+\hline
+Pytanie sprawdzające nr 3 & $0$ – w przypadku braku lub niepoprawnej odpowiedzi; $1$ – w przypadku częściowo poprawnej lub niepełnej odpowiedzi; $2$ – w przypadku pełnej i poprawnej odpowiedzi \\
+\hline
+Sprawozdanie z ćwiczenia & $0$ – brak sprawozdania w wyznaczonym terminie lub całkowicie błędne sprawozdanie pod względem redakcyjnym i merytorycznym; $1$ – sprawozdanie jest częściowo poprawnie zredagowane lub zawiera niepełne wyniki; $2$ – sprawozdanie jest poprawne pod względem redakcyjnym i zawiera poprawne wyniki \\
+\hline
+\end{tabular}
+\end{table}
+
+% -------------------------------------------------------------------------------------------
+%\nocite{*}
+\bibliographystyle{plain}
+\bibliography{11bibliography}
+
+\end{document}
